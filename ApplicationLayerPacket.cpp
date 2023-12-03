@@ -7,7 +7,7 @@ ApplicationLayerPacket::ApplicationLayerPacket(int _layer_ID, const string &_sen
 }
 
 void ApplicationLayerPacket::print() {
-    // TODO: Override the virtual print function from Packet class to additionally print layer-specific properties.
+    cout << "Sender ID: " << sender_ID << ", Receiver ID: " << receiver_ID << ", Message data: " << message_data << endl;
 }
 
 ApplicationLayerPacket::~ApplicationLayerPacket() {
