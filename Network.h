@@ -21,6 +21,13 @@ public:
     vector<Client> read_clients(string const &filename);
     void read_routing_tables(vector<Client> & clients, string const &filename);
     vector<string> read_commands(const string &filename); 
+    void message_command();
+    void show_frame_info_command();
+    void show_q_info_command();
+    void send_command();
+    void receive_command();
+    void print_log_command();
+    void invalid_command();
 };
 
 #endif  // NETWORK_H
