@@ -5,7 +5,42 @@ Network::Network() {
 
 }
 
-void Network::message_command(){
+
+
+void Network::process_commands(vector<Client> &clients, vector<string> &commands, int message_limit,
+                      const string &sender_port, const string &receiver_port) {
+    // TODO: Execute the commands given as a vector of strings while utilizing the remaining arguments.
+    /* Don't use any static variables, assume this method will be called over and over during testing.
+     Don't forget to update the necessary member variables after processing each command. For example,
+     after the MESSAGE command, the outgoing queue of the sender must have the expected frames ready to send. */
+    int command_count = commands.size();
+    for (int i = 0; i < command_count; ++i) {
+        string command = commands[i];
+        if(command.substr(0,7) == "MESSAGE"){
+            message_command(clients, message_limit, sender_port, receiver_port);
+        }
+        else if(command.substr(0,15) == "SHOW_FRAME_INFO"){
+            show_frame_info_command();
+        }
+        else if(command.substr(0,11) == "SHOW_Q_INFO"){
+            show_q_info_command();
+        }
+        else if(command == "SEND"){
+            send_command();
+        }
+        else if(command == "RECEIVE"){
+            receive_command();
+        }
+        else if(command.substr(0,9) == "PRINT_LOG"){
+            print_log_command();
+        }
+        else{
+            invalid_command();
+        }
+    }
+}
+
+void Network::message_command(vector<Client> &clients, int message_limit, const string &sender_port, const string &receiver_port){
     cout << "MESSAGE" << endl;
 }
 
@@ -31,39 +66,6 @@ void Network::print_log_command(){
 
 void Network::invalid_command(){
     cout << "Invalid command" << endl;
-}
-
-void Network::process_commands(vector<Client> &clients, vector<string> &commands, int message_limit,
-                      const string &sender_port, const string &receiver_port) {
-    // TODO: Execute the commands given as a vector of strings while utilizing the remaining arguments.
-    /* Don't use any static variables, assume this method will be called over and over during testing.
-     Don't forget to update the necessary member variables after processing each command. For example,
-     after the MESSAGE command, the outgoing queue of the sender must have the expected frames ready to send. */
-    int command_count = commands.size();
-    for (int i = 0; i < command_count; ++i) {
-        string command = commands[i];
-        if(command == "MESSAGE"){
-            message_command();
-        }
-        else if(command == "SHOW_FRAME_INFO"){
-            show_frame_info_command();
-        }
-        else if(command == "SHOW_Q_INFO"){
-            show_q_info_command();
-        }
-        else if(command == "SEND"){
-            send_command();
-        }
-        else if(command == "RECEIVE"){
-            receive_command();
-        }
-        else if(command == "PRINT_LOG"){
-            print_log_command();
-        }
-        else{
-            invalid_command();
-        }
-    }
 }
 
 vector<Client> Network::read_clients(const string &filename) {
