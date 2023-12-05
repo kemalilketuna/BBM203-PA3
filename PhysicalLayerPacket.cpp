@@ -13,3 +13,11 @@ void PhysicalLayerPacket::print() {
 PhysicalLayerPacket::~PhysicalLayerPacket() {
     // TODO: Free any dynamically allocated memory if necessary.
 }
+
+void PhysicalLayerPacket::increment_hop_count() {
+    hop_count++;
+}
+
+int PhysicalLayerPacket::get_hop_count() {
+    return hop_count;
+}

@@ -22,7 +22,7 @@ Client::~Client() {
         stack<Packet*>& packetStack = incoming_queue.front();
         // Deallocate each Packet object in the stack
         while (!packetStack.empty()) {
-            delete packetStack.top(); // Use 'delete' to deallocate memory
+            delete packetStack.top();
             packetStack.pop();
         }
         incoming_queue.pop();
@@ -32,7 +32,7 @@ Client::~Client() {
     while (!outgoing_queue.empty()) {
         stack<Packet*>& packetStack = outgoing_queue.front();
         while (!packetStack.empty()) {
-            delete packetStack.top(); // Deallocate Packet objects
+            delete packetStack.top();
             packetStack.pop();
         }
         outgoing_queue.pop();

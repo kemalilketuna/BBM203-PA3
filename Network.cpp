@@ -25,6 +25,12 @@ void Network::process_commands(vector<Client> &clients, vector<string> &commands
     int command_count = commands.size();
     for (int i = 0; i < command_count; ++i) {
         string command = commands[i];
+        
+        // Print command
+        cout << string(9 + command.size(), '-') << endl;
+        cout << "Command: " <<command << endl;
+        cout << string(9 + command.size(), '-') << endl;
+        
         if(command.substr(0,7) == "MESSAGE"){
             message_command(clients, message_limit, sender_port, receiver_port, command);
         }
@@ -50,11 +56,6 @@ void Network::process_commands(vector<Client> &clients, vector<string> &commands
 }
 
 void Network::message_command(vector<Client> &clients, int message_limit, const string sender_port, const string receiver_port, string command){
-    // Print command
-    cout << string(9 + command.size(), '-') << endl;
-    cout << "Command: " <<command << endl;
-    cout << string(9 + command.size(), '-') << endl;
-
     // Split the message
     std::istringstream iss(command);
     string command_name, sender_id, receiver_id, message;
@@ -124,29 +125,24 @@ void Network::message_command(vector<Client> &clients, int message_limit, const 
     }
 }
 
-void Network::show_frame_info_command(){
-    cout << "SHOW_FRAME_INFO" << endl;
+void Network::show_frame_info_command(vector<Client> &clients, string command){
+    
 }
 
 void Network::show_q_info_command(){
-    cout << "SHOW_Q_INFO" << endl;
 }
 
 void Network::send_command(){
-    cout << "SEND" << endl;
 }
 
 void Network::receive_command(){
-    cout << "RECEIVE" << endl;
 }
 
 void Network::print_log_command(){
     // timestamp 2023-11-22 20:30:03
-    cout << "PRINT_LOG" << endl;
 }
 
 void Network::invalid_command(){
-    cout << "Invalid command" << endl;
 }
 
 vector<Client> Network::read_clients(const string &filename) {
