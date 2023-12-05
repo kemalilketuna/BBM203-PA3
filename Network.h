@@ -22,7 +22,7 @@ public:
     void read_routing_tables(vector<Client> & clients, string const &filename);
     vector<string> read_commands(const string &filename); 
 private:
-    void message_command(vector<Client> &clients, int message_limit, const string &sender_port, const string &receiver_port);
+    void message_command(vector<Client> &clients, int message_limit, const string sender_port, const string receiver_port, string command);
     void show_frame_info_command();
     void show_q_info_command();
     void send_command();

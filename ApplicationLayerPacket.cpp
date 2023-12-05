@@ -7,7 +7,7 @@ ApplicationLayerPacket::ApplicationLayerPacket(int _layer_ID, const string &_sen
 }
 
 void ApplicationLayerPacket::print() {
-    cout << "Sender ID: " << sender_ID << ", Receiver ID: " << receiver_ID << ", Message data: " << message_data << endl;
+    cout << "Sender ID: " << sender_ID << ", Receiver ID: " << receiver_ID << endl;
 }
 
 ApplicationLayerPacket::~ApplicationLayerPacket() {

@@ -17,5 +17,24 @@ ostream &operator<<(ostream &os, const Client &client) {
 }
 
 Client::~Client() {
-    // TODO: Free any dynamically allocated memory if necessary.
+    // Iterate through each stack in the incoming_queue
+    while (!incoming_queue.empty()) {
+        stack<Packet*>& packetStack = incoming_queue.front();
+        // Deallocate each Packet object in the stack
+        while (!packetStack.empty()) {
+            delete packetStack.top(); // Use 'delete' to deallocate memory
+            packetStack.pop();
+        }
+        incoming_queue.pop();
+    }
+
+    // Repeat the same process for the outgoing_queue
+    while (!outgoing_queue.empty()) {
+        stack<Packet*>& packetStack = outgoing_queue.front();
+        while (!packetStack.empty()) {
+            delete packetStack.top(); // Deallocate Packet objects
+            packetStack.pop();
+        }
+        outgoing_queue.pop();
+    }
 }

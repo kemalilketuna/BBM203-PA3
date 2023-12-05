@@ -1,10 +1,19 @@
-#include "Network.h"
 #include <iostream>
 #include <sstream>
+#include <string>
+#include <stack>
+#include <queue>
+
+#include "Network.h"
+#include "Client.h"
+#include "ApplicationLayerPacket.h"
+#include "TransportLayerPacket.h"
+#include "NetworkLayerPacket.h"
+#include "PhysicalLayerPacket.h"
+
 Network::Network() {
 
 }
-
 
 
 void Network::process_commands(vector<Client> &clients, vector<string> &commands, int message_limit,
@@ -17,7 +26,7 @@ void Network::process_commands(vector<Client> &clients, vector<string> &commands
     for (int i = 0; i < command_count; ++i) {
         string command = commands[i];
         if(command.substr(0,7) == "MESSAGE"){
-            message_command(clients, message_limit, sender_port, receiver_port);
+            message_command(clients, message_limit, sender_port, receiver_port, command);
         }
         else if(command.substr(0,15) == "SHOW_FRAME_INFO"){
             show_frame_info_command();
@@ -40,8 +49,79 @@ void Network::process_commands(vector<Client> &clients, vector<string> &commands
     }
 }
 
-void Network::message_command(vector<Client> &clients, int message_limit, const string &sender_port, const string &receiver_port){
-    cout << "MESSAGE" << endl;
+void Network::message_command(vector<Client> &clients, int message_limit, const string sender_port, const string receiver_port, string command){
+    // Print command
+    cout << string(9 + command.size(), '-') << endl;
+    cout << "Command: " <<command << endl;
+    cout << string(9 + command.size(), '-') << endl;
+
+    // Split the message
+    std::istringstream iss(command);
+    string command_name, sender_id, receiver_id, message;
+    iss >> command_name >> sender_id >> receiver_id;
+
+    // Extract the message
+    getline(iss, message);
+    message = message.substr(2, message.length()-3);
+
+    // Print the message
+    cout << "Message to be sent: \"" << message << "\"\n" << endl;
+
+    // Split the message into frames
+    vector<string> message_chunks;
+    int message_length = message.length();
+    int numChunks = (message_length + message_limit - 1) / message_limit;
+    for (int i = 0; i < numChunks; ++i) {
+        message_chunks.push_back(message.substr(i*message_limit, message_limit));
+    }
+
+    // Find the sender and receiver clients
+    Client* sender = nullptr;
+    Client* receiver = nullptr;
+    Client* next_hop_client = nullptr;
+    for (int i = 0; i < clients.size(); ++i) {
+        if(clients[i].client_id == sender_id){
+            sender = &clients[i];
+        }
+        if(clients[i].client_id == receiver_id){
+            receiver = &clients[i];
+        }
+    }
+
+    // Find the next hop
+    string next_hop = sender->routing_table[receiver_id];
+    for (int i = 0; i < clients.size(); ++i) {
+        if(clients[i].client_id == next_hop){
+            next_hop_client = &clients[i];
+        }
+    }
+
+    // Create frames and push them to the outgoing queue of the sender
+    int frame_idx = 0;
+    for (int i = 0; i < message_chunks.size(); ++i) {
+        stack<Packet*> new_frame;
+        ApplicationLayerPacket* app_packet = new ApplicationLayerPacket(0, sender_id, receiver_id, message_chunks[i]);
+        TransportLayerPacket* transport_packet = new TransportLayerPacket(1, sender_port, receiver_port);
+        NetworkLayerPacket* network_packet = new NetworkLayerPacket(2, sender->client_ip, receiver->client_ip);
+        PhysicalLayerPacket* physical_packet = new PhysicalLayerPacket(3, sender->client_mac, next_hop_client->client_mac);
+        
+        new_frame.push(app_packet);
+        new_frame.push(transport_packet);
+        new_frame.push(network_packet);
+        new_frame.push(physical_packet);
+        sender->outgoing_queue.push(new_frame);
+
+        // Print the frame
+        frame_idx++;
+        cout << "Frame #" << frame_idx << endl;
+        physical_packet->print();
+        network_packet->print();
+        transport_packet->print();
+        app_packet->print();
+        cout << "Message chunk carried: \"" << message_chunks[i] << "\"" << endl;
+        cout << "Number of hops so far: 0" << endl;
+        cout << "--------" << endl;
+    }
 }
 
 void Network::show_frame_info_command(){
@@ -61,6 +141,7 @@ void Network::receive_command(){
 }
 
 void Network::print_log_command(){
+    // timestamp 2023-11-22 20:30:03
     cout << "PRINT_LOG" << endl;
 }
 
