@@ -35,10 +35,10 @@ void Network::process_commands(vector<Client> &clients, vector<string> &commands
             message_command(clients, message_limit, sender_port, receiver_port, command);
         }
         else if(command.substr(0,15) == "SHOW_FRAME_INFO"){
-            show_frame_info_command();
+            show_frame_info_command(clients, command);
         }
         else if(command.substr(0,11) == "SHOW_Q_INFO"){
-            show_q_info_command();
+            show_q_info_command(clients, command);
         }
         else if(command == "SEND"){
             send_command();
@@ -77,25 +77,12 @@ void Network::message_command(vector<Client> &clients, int message_limit, const 
     }
 
     // Find the sender and receiver clients
-    Client* sender = nullptr;
-    Client* receiver = nullptr;
-    Client* next_hop_client = nullptr;
-    for (int i = 0; i < clients.size(); ++i) {
-        if(clients[i].client_id == sender_id){
-            sender = &clients[i];
-        }
-        if(clients[i].client_id == receiver_id){
-            receiver = &clients[i];
-        }
-    }
+    Client* sender = client_finder(clients, sender_id);
+    Client* receiver = client_finder(clients, receiver_id);
 
     // Find the next hop
     string next_hop = sender->routing_table[receiver_id];
-    for (int i = 0; i < clients.size(); ++i) {
-        if(clients[i].client_id == next_hop){
-            next_hop_client = &clients[i];
-        }
-    }
+    Client* next_hop_client = client_finder(clients, next_hop);
 
     // Create frames and push them to the outgoing queue of the sender
     int frame_idx = 0;
@@ -126,13 +113,79 @@ void Network::message_command(vector<Client> &clients, int message_limit, const 
 }
 
 void Network::show_frame_info_command(vector<Client> &clients, string command){
+    string command_name, client_id, in_out, frame_index;
+    istringstream iss(command);
+    iss >> command_name >> client_id >> in_out >> frame_index;
     
+    int frame_idx = stoi(frame_index);
+    bool is_in = (in_out == "in");
+
+    // Find the client
+    Client* client = client_finder(clients, client_id);
+
+    // Determine the queue
+    queue<stack<Packet*>> temp_queue = is_in ? client->incoming_queue : client->outgoing_queue;
+
+
+    // Find the frame
+    if(frame_idx > temp_queue.size()){
+        cout << "No such frame." << endl;
+        return;
+    }else{
+        for (int i = 1; i < frame_idx; ++i) {
+            temp_queue.pop();
+        }
+    }
+    
+    
+    // Get the frame copy
+    stack<Packet*> frame = temp_queue.front();
+
+    PhysicalLayerPacket* physical_packet = (PhysicalLayerPacket*) frame.top();
+    frame.pop();
+    NetworkLayerPacket* network_packet = (NetworkLayerPacket*) frame.top();
+    frame.pop();
+    TransportLayerPacket* transport_packet = (TransportLayerPacket*) frame.top();
+    frame.pop();
+    ApplicationLayerPacket* app_packet = (ApplicationLayerPacket*) frame.top();
+    frame.pop();
+    // Print the frame
+    cout << "Current Frame #" << frame_idx << " on the " << (is_in ? "incoming" : "outgoing") << " queue of client " << client_id << endl;
+    
+    // TODO: Print the frame
+    cout << "Carried Message: \"" << app_packet->message_data << "\"" << endl;
+    
+    cout << "Layer 0 info: ";
+    app_packet->print();
+    cout << "Layer 1 info: ";
+    transport_packet->print();
+    cout << "Layer 2 info: ";
+    network_packet->print();
+    cout << "Layer 3 info: ";
+    physical_packet->print();
+    cout << "Number of hops so far: " << physical_packet->get_hop_count() << endl;
 }
 
-void Network::show_q_info_command(){
+void Network::show_q_info_command(vector<Client> &clients, string command){
+    string command_name, client_id, in_out, frame_index;
+    istringstream iss(command);
+    iss >> command_name >> client_id >> in_out;
+
+    bool is_in = (in_out == "in");
+
+    // Find the client
+    Client* client = client_finder(clients, client_id);
+
+    // Determine the queue
+    queue<stack<Packet*>> temp_queue = is_in ? client->incoming_queue : client->outgoing_queue;
+
+    // Print the queue info
+    cout << "Client " << client_id << " " << (is_in ? "Incoming" : "Outgoing") << " Queue Status" << endl;
+    cout << "Current total number of frames: " << temp_queue.size() << endl;
 }
 
 void Network::send_command(){
+
 }
 
 void Network::receive_command(){
@@ -143,6 +196,15 @@ void Network::print_log_command(){
 }
 
 void Network::invalid_command(){
+}
+
+Client *Network::client_finder(vector<Client> &clients, string client_id) {
+    for (int i = 0; i < clients.size(); ++i) {
+        if(clients[i].client_id == client_id){
+            return &clients[i];
+        }
+    }
+    throw "No such client";
 }
 
 vector<Client> Network::read_clients(const string &filename) {
