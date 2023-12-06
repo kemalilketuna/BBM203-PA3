@@ -14,10 +14,19 @@ PhysicalLayerPacket::~PhysicalLayerPacket() {
     // TODO: Free any dynamically allocated memory if necessary.
 }
 
-void PhysicalLayerPacket::increment_hop_count() {
+void PhysicalLayerPacket::increase_hop_count() {
     hop_count++;
 }
 
 int PhysicalLayerPacket::get_hop_count() {
     return hop_count;
+}
+
+void PhysicalLayerPacket::set_frame_idx(int _frame_idx) {
+    if(frame_idx == 0 && _frame_idx > 0)
+        frame_idx = _frame_idx;
+}
+
+int PhysicalLayerPacket::get_frame_idx() {
+    return frame_idx;
 }

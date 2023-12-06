@@ -1,5 +1,6 @@
 #include <iostream>
 #include "Network.h"
+#include <string>
 
 using namespace std;
 

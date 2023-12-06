@@ -41,10 +41,10 @@ void Network::process_commands(vector<Client> &clients, vector<string> &commands
             show_q_info_command(clients, command);
         }
         else if(command == "SEND"){
-            send_command();
+            send_command(clients);
         }
         else if(command == "RECEIVE"){
-            receive_command();
+            receive_command(clients);
         }
         else if(command.substr(0,9) == "PRINT_LOG"){
             print_log_command();
@@ -77,22 +77,24 @@ void Network::message_command(vector<Client> &clients, int message_limit, const 
     }
 
     // Find the sender and receiver clients
-    Client* sender = client_finder(clients, sender_id);
-    Client* receiver = client_finder(clients, receiver_id);
+    Client* sender = client_find_id(clients, sender_id);
+    Client* receiver = client_find_id(clients, receiver_id);
 
     // Find the next hop
     string next_hop = sender->routing_table[receiver_id];
-    Client* next_hop_client = client_finder(clients, next_hop);
+    Client* next_hop_client = client_find_id(clients, next_hop);
 
     // Create frames and push them to the outgoing queue of the sender
     int frame_idx = 0;
     for (int i = 0; i < message_chunks.size(); ++i) {
+        frame_idx++;
         stack<Packet*> new_frame;
         ApplicationLayerPacket* app_packet = new ApplicationLayerPacket(0, sender_id, receiver_id, message_chunks[i]);
         TransportLayerPacket* transport_packet = new TransportLayerPacket(1, sender_port, receiver_port);
         NetworkLayerPacket* network_packet = new NetworkLayerPacket(2, sender->client_ip, receiver->client_ip);
         PhysicalLayerPacket* physical_packet = new PhysicalLayerPacket(3, sender->client_mac, next_hop_client->client_mac);
-        
+        physical_packet->set_frame_idx(frame_idx);
+
         new_frame.push(app_packet);
         new_frame.push(transport_packet);
         new_frame.push(network_packet);
@@ -100,7 +102,6 @@ void Network::message_command(vector<Client> &clients, int message_limit, const 
         sender->outgoing_queue.push(new_frame);
 
         // Print the frame
-        frame_idx++;
         cout << "Frame #" << frame_idx << endl;
         physical_packet->print();
         network_packet->print();
@@ -121,7 +122,8 @@ void Network::show_frame_info_command(vector<Client> &clients, string command){
     bool is_in = (in_out == "in");
 
     // Find the client
-    Client* client = client_finder(clients, client_id);
+    Client* client = client_find_id(clients, client_id);
+
 
     // Determine the queue
     queue<stack<Packet*>> temp_queue = is_in ? client->incoming_queue : client->outgoing_queue;
@@ -140,30 +142,33 @@ void Network::show_frame_info_command(vector<Client> &clients, string command){
     
     // Get the frame copy
     stack<Packet*> frame = temp_queue.front();
-
-    PhysicalLayerPacket* physical_packet = (PhysicalLayerPacket*) frame.top();
-    frame.pop();
-    NetworkLayerPacket* network_packet = (NetworkLayerPacket*) frame.top();
-    frame.pop();
-    TransportLayerPacket* transport_packet = (TransportLayerPacket*) frame.top();
-    frame.pop();
-    ApplicationLayerPacket* app_packet = (ApplicationLayerPacket*) frame.top();
-    frame.pop();
-    // Print the frame
-    cout << "Current Frame #" << frame_idx << " on the " << (is_in ? "incoming" : "outgoing") << " queue of client " << client_id << endl;
-    
-    // TODO: Print the frame
-    cout << "Carried Message: \"" << app_packet->message_data << "\"" << endl;
-    
-    cout << "Layer 0 info: ";
-    app_packet->print();
-    cout << "Layer 1 info: ";
-    transport_packet->print();
-    cout << "Layer 2 info: ";
-    network_packet->print();
-    cout << "Layer 3 info: ";
-    physical_packet->print();
-    cout << "Number of hops so far: " << physical_packet->get_hop_count() << endl;
+  
+    // TODO: Check this part
+    if(frame.size() == 4){
+        PhysicalLayerPacket* physical_packet = (PhysicalLayerPacket*) frame.top();
+        frame.pop();
+        NetworkLayerPacket* network_packet = (NetworkLayerPacket*) frame.top();
+        frame.pop();
+        TransportLayerPacket* transport_packet = (TransportLayerPacket*) frame.top();
+        frame.pop();
+        ApplicationLayerPacket* app_packet = (ApplicationLayerPacket*) frame.top();
+        frame.pop();
+        // Print the frame
+        cout << "Current Frame #" << frame_idx << " on the " << (is_in ? "incoming" : "outgoing") << " queue of client " << client_id << endl;
+        
+        // TODO: Print the frame
+        cout << "Carried Message: \"" << app_packet->message_data << "\"" << endl;
+        
+        cout << "Layer 0 info: ";
+        app_packet->print();
+        cout << "Layer 1 info: ";
+        transport_packet->print();
+        cout << "Layer 2 info: ";
+        network_packet->print();
+        cout << "Layer 3 info: ";
+        physical_packet->print();
+        cout << "Number of hops so far: " << physical_packet->get_hop_count() << endl;
+    }
 }
 
 void Network::show_q_info_command(vector<Client> &clients, string command){
@@ -174,7 +179,7 @@ void Network::show_q_info_command(vector<Client> &clients, string command){
     bool is_in = (in_out == "in");
 
     // Find the client
-    Client* client = client_finder(clients, client_id);
+    Client* client = client_find_id(clients, client_id);
 
     // Determine the queue
     queue<stack<Packet*>> temp_queue = is_in ? client->incoming_queue : client->outgoing_queue;
@@ -184,11 +189,88 @@ void Network::show_q_info_command(vector<Client> &clients, string command){
     cout << "Current total number of frames: " << temp_queue.size() << endl;
 }
 
-void Network::send_command(){
+void Network::send_command(vector<Client> &clients){
+    for (int i = 0; i < clients.size(); ++i) {
+        Client *sender = &clients[i];
+        if(sender->outgoing_queue.empty()){
+            continue;
+        }
 
+        while (!sender->outgoing_queue.empty()){
+            stack<Packet*> frame = sender->outgoing_queue.front();
+            sender->outgoing_queue.pop();
+            PhysicalLayerPacket* physical_packet = (PhysicalLayerPacket*) frame.top();
+            frame.pop();
+            NetworkLayerPacket* network_packet = (NetworkLayerPacket*) frame.top();
+            frame.pop();
+            TransportLayerPacket* transport_packet = (TransportLayerPacket*) frame.top();
+            frame.pop();
+            ApplicationLayerPacket* app_packet = (ApplicationLayerPacket*) frame.top();
+            frame.pop();
+
+            // Find the next hop
+            Client *next_hop_client = client_find_mac(clients, physical_packet->receiver_MAC_address);
+            
+            // Update the hop count
+            physical_packet->increase_hop_count();
+
+            // Push the frame to the incoming queue of the next hop
+            stack<Packet*> new_frame;
+            new_frame.push(app_packet);
+            new_frame.push(transport_packet);
+            new_frame.push(network_packet);
+            new_frame.push(physical_packet);
+            next_hop_client->incoming_queue.push(new_frame);
+
+            // Print the process
+            cout << "Client " << sender->client_id << " sending frame #" << physical_packet->get_frame_idx() << " to client " << next_hop_client->client_id << endl;
+            physical_packet->print();
+            network_packet->print();
+            transport_packet->print();
+            app_packet->print();
+            cout << "Message chunk carried: \"" << app_packet->message_data << "\"" << endl;
+            cout << "Number of hops so far: " << physical_packet->get_hop_count() << endl;
+            cout << "--------" << endl;
+        }
+    }
 }
 
-void Network::receive_command(){
+void Network::receive_command(vector<Client> &clients){
+
+    // for (int i = 0; i < clients.size(); ++i) {
+    //     Client *receiver = &clients[i];
+    //     if(receiver->incoming_queue.empty()){
+    //         continue;
+    //     }
+
+    //     vector<queue<stack<Packet*>>> message_list;
+    //     queue<stack<Packet*>> new_message;
+    //     message_list.push_back(new_message);
+    //     int last_frame_idx = 0;
+    //     while (!receiver->incoming_queue.empty()){
+    //         stack<Packet*> frame = receiver->incoming_queue.front();
+    //         receiver->incoming_queue.pop();
+    //         if(last_frame_idx < ((PhysicalLayerPacket*) frame.top())->get_frame_idx()){
+    //             last_frame_idx++;
+    //             new_message.push(frame);
+    //         }else{
+    //             new_message = queue<stack<Packet*>>();
+    //             message_list.push_back(new_message);
+    //             new_message.push(frame);
+    //             last_frame_idx = 1;
+    //         }
+    //     }
+
+    //     for(int msg_idx = 0; msg_idx < message_list.size(); ++msg_idx){
+    //         queue<stack<Packet*>> message = message_list[msg_idx];
+    //         // check message received
+    //         if(((PhysicalLayerPacket*)message.front().top())->receiver_MAC_address == receiver->client_mac){
+    //             //message is received
+    //         }else{
+    //             //message is not received
+    //         }
+    //     } 
+    // }      
 }
 
 void Network::print_log_command(){
@@ -196,15 +278,25 @@ void Network::print_log_command(){
 }
 
 void Network::invalid_command(){
+    cout << "Invalid command." << endl;
 }
 
-Client *Network::client_finder(vector<Client> &clients, string client_id) {
+Client *Network::client_find_mac(vector<Client> &clients, string client_mac) {
+    for (int i = 0; i < clients.size(); ++i) {
+        if(clients[i].client_mac == client_mac){
+            return &clients[i];
+        }
+    }
+    return nullptr;
+}
+
+Client *Network::client_find_id(vector<Client> &clients, string client_id) {
     for (int i = 0; i < clients.size(); ++i) {
         if(clients[i].client_id == client_id){
             return &clients[i];
         }
     }
-    throw "No such client";
+    return nullptr;
 }
 
 vector<Client> Network::read_clients(const string &filename) {

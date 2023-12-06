@@ -5,6 +5,7 @@
 #include <iostream>
 #include "Packet.h"
 #include "Client.h"
+#include <string>
 
 using namespace std;
 
@@ -25,11 +26,12 @@ private:
     void message_command(vector<Client> &clients, int message_limit, const string sender_port, const string receiver_port, string command);
     void show_frame_info_command(vector<Client> &clients, string command);
     void show_q_info_command(vector<Client> &clients, string command);
-    void send_command();
-    void receive_command();
+    void send_command(vector<Client> &clients);
+    void receive_command(vector<Client> &clients);
     void print_log_command();
     void invalid_command();
-    Client* client_finder(vector<Client> &clients, string client_id);
+    Client* client_find_id(vector<Client> &clients, string client_id);
+    Client* client_find_mac(vector<Client> &clients, string client_mac);
 };
 
 #endif  // NETWORK_H

@@ -13,11 +13,14 @@ public:
 
     string sender_MAC_address;
     string receiver_MAC_address;
-    void increment_hop_count();
+    void increase_hop_count();
     int get_hop_count();
+    void set_frame_idx(int chunk_count);
+    int get_frame_idx();
     void print() override;
 private:
-    int hop_count;
+    int hop_count = 0;
+    int frame_idx = 0;
 };
 
 #endif // PHYSICAL_LAYER_PACKET_H
