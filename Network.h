@@ -28,7 +28,7 @@ private:
     void show_q_info_command(vector<Client> &clients, string command);
     void send_command(vector<Client> &clients);
     void receive_command(vector<Client> &clients);
-    void print_log_command();
+    void print_log_command(vector<Client> &clients, string command);
     void invalid_command();
     Client* client_find_id(vector<Client> &clients, string client_id);
     Client* client_find_mac(vector<Client> &clients, string client_mac);

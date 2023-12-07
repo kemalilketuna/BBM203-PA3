@@ -10,6 +10,7 @@
 #include "TransportLayerPacket.h"
 #include "NetworkLayerPacket.h"
 #include "PhysicalLayerPacket.h"
+#include "Log.h"
 
 Network::Network() {
 
@@ -18,10 +19,6 @@ Network::Network() {
 
 void Network::process_commands(vector<Client> &clients, vector<string> &commands, int message_limit,
                       const string &sender_port, const string &receiver_port) {
-    // TODO: Execute the commands given as a vector of strings while utilizing the remaining arguments.
-    /* Don't use any static variables, assume this method will be called over and over during testing.
-     Don't forget to update the necessary member variables after processing each command. For example,
-     after the MESSAGE command, the outgoing queue of the sender must have the expected frames ready to send. */
     int command_count = commands.size();
     for (int i = 0; i < command_count; ++i) {
         string command = commands[i];
@@ -47,7 +44,7 @@ void Network::process_commands(vector<Client> &clients, vector<string> &commands
             receive_command(clients);
         }
         else if(command.substr(0,9) == "PRINT_LOG"){
-            print_log_command();
+            print_log_command(clients, command);
         }
         else{
             invalid_command();
@@ -111,6 +108,10 @@ void Network::message_command(vector<Client> &clients, int message_limit, const 
         cout << "Number of hops so far: 0" << endl;
         cout << "--------" << endl;
     }
+
+    // Create Log
+    Log* log = new Log("2023-11-22 20:30:03", message, frame_idx, 0, sender_id, receiver_id, true, ActivityType::MESSAGE_SENT);
+    sender->log_entries.push_back(*log);
 }
 
 void Network::show_frame_info_command(vector<Client> &clients, string command){
@@ -262,6 +263,7 @@ void Network::receive_command(vector<Client> &clients){
 
             // Check message received
             if(app_packet->receiver_ID == client->client_id){
+                // Message received
                 received_message += app_packet->message_data;
                 //Client E receiving frame #4 from client D, originating from client C
                 cout << "Client " << client->client_id << " receiving frame #" << physical_packet->get_frame_idx() << " from client " << previous_hop_client->client_id << ", originating from client " << app_packet->sender_ID << endl;
@@ -277,6 +279,10 @@ void Network::receive_command(vector<Client> &clients){
                     (client->incoming_queue.empty() and received_message.length() != 0) or
                     (!client->incoming_queue.empty() and ((PhysicalLayerPacket*)client->incoming_queue.front().top())->get_frame_idx() < physical_packet->get_frame_idx())
                 ){
+                    // Create Log
+                    Log* log = new Log("2023-11-22 20:30:03", received_message, physical_packet->get_frame_idx(), physical_packet->get_hop_count(), app_packet->sender_ID, app_packet->receiver_ID, true, ActivityType::MESSAGE_RECEIVED);
+                    client->log_entries.push_back(*log);
+
                     //Client E received the message "A few small hops for frames, but a giant leap for this message." from client C.
                     cout << "Client " << client->client_id << " received the message \"" << received_message << "\" from client " << app_packet->sender_ID << "." << endl;
                     cout << "--------" << endl;
@@ -293,6 +299,10 @@ void Network::receive_command(vector<Client> &clients){
                 string next_hop = client->routing_table[app_packet->receiver_ID];
                 Client* next_hop_client = client_find_id(clients, next_hop);
                 if(next_hop_client == nullptr){
+                    int hop_count = physical_packet->get_hop_count();
+                    int frame_idx = physical_packet->get_frame_idx();
+                    string receiver_id = app_packet->receiver_ID;
+                    string sender_id = app_packet->sender_ID;
                     //Error: Unreachable destination. Packets are dropped after 1 hops!
                     cout << "Client " << client->client_id << " receiving frame #" << physical_packet->get_frame_idx() << " from client " << app_packet->sender_ID << ".Forwarding... "<< endl;
                     cout << "Error: Unreachable destination. Packets are dropped after "<< physical_packet->get_hop_count() <<" hops!" << endl;
@@ -301,7 +311,35 @@ void Network::receive_command(vector<Client> &clients){
                     delete transport_packet;
                     delete network_packet;
                     delete physical_packet;
+
+                    while(!client->incoming_queue.empty() and ((PhysicalLayerPacket*)client->incoming_queue.front().top())->get_frame_idx() > physical_packet->get_frame_idx()){
+                        stack <Packet*> frame = client->incoming_queue.front();
+                        client->incoming_queue.pop();
+
+                        PhysicalLayerPacket* physical_packet = (PhysicalLayerPacket*) frame.top();
+                        frame.pop();
+                        NetworkLayerPacket* network_packet = (NetworkLayerPacket*) frame.top();
+                        frame.pop();
+                        TransportLayerPacket* transport_packet = (TransportLayerPacket*) frame.top();
+                        frame.pop();
+                        ApplicationLayerPacket* app_packet = (ApplicationLayerPacket*) frame.top();
+                        frame.pop();
+                        cout << "Client " << client->client_id << " receiving frame #" << physical_packet->get_frame_idx() << " from client " << app_packet->sender_ID << ".Forwarding... "<< endl;
+                        cout << "Error: Unreachable destination. Packets are dropped after "<< physical_packet->get_hop_count() <<" hops!" << endl;
+                        cout << "--------" << endl;
+                        frame_idx = physical_packet->get_frame_idx();
+                        delete app_packet;
+                        delete transport_packet;
+                        delete network_packet;
+                        delete physical_packet;    
+                    }
+
+                    // Create Log
+                    Log* log = new Log("2023-11-22 20:30:03", "", frame_idx, hop_count, sender_id, receiver_id, false, ActivityType::MESSAGE_DROPPED);
+                    client->log_entries.push_back(*log);
+
                 }else{
+                    int frame_idx = physical_packet->get_frame_idx();
                     //Client D receiving a message from client B, but intended for client E. Forwarding... 
                     cout << "Client " << client->client_id << " receiving a message from client "  << previous_hop_client->client_id << ", but intended for client " << app_packet->receiver_ID << ". Forwarding... " << endl;
                     // Frame #1 MAC address change: New sender MAC BBBBBBBBBB, new receiver MAC DDDDDDDDDD
@@ -327,6 +365,7 @@ void Network::receive_command(vector<Client> &clients){
                         frame.pop();
                         ApplicationLayerPacket* app_packet = (ApplicationLayerPacket*) frame.top();
                         frame.pop();
+                        frame_idx = physical_packet->get_frame_idx();
                         cout << "Frame #" << physical_packet->get_frame_idx() << " MAC address change: New sender MAC " << client->client_mac << ", new receiver MAC " << next_hop_client->client_mac << endl;
                         physical_packet->sender_MAC_address = client->client_mac;
                         physical_packet->receiver_MAC_address = next_hop_client->client_mac;
@@ -337,16 +376,65 @@ void Network::receive_command(vector<Client> &clients){
                         new_frame.push(physical_packet);
                         client->outgoing_queue.push(new_frame);    
                     }
-
                     cout << "--------" << endl;
+                    
+                    // Create Message Forwarded Log
+                    Log* log = new Log("2023-11-22 20:30:03", "", frame_idx, physical_packet->get_hop_count(), app_packet->sender_ID, app_packet->receiver_ID, true, ActivityType::MESSAGE_FORWARDED);
+                    client->log_entries.push_back(*log);
                 }
             }
         }
     }      
 }
 
-void Network::print_log_command(){
+void Network::print_log_command(vector<Client> &clients, string command){
     // timestamp 2023-11-22 20:30:03
+    string command_name, client_id;
+    istringstream iss(command);
+    iss >> command_name >> client_id;
+    Client *client = client_find_id(clients, client_id);
+    vector<Log>& logs = client->log_entries;
+
+    if(logs.empty()){
+        return;
+    }
+
+    cout << "Client " << client_id << " Logs:" << endl;
+    
+    for (int i = 0; i < logs.size(); ++i) {
+        Log log = logs[i];
+        cout << "--------------" << endl;
+        string activity_type = "";
+        switch (log.activity_type) {
+            case ActivityType::MESSAGE_RECEIVED:
+                activity_type = "Message Received";
+                break;
+            case ActivityType::MESSAGE_FORWARDED:
+                activity_type = "Message Forwarded";
+                break;
+            case ActivityType::MESSAGE_SENT:
+                activity_type = "Message Sent";
+                break;
+            case ActivityType::MESSAGE_DROPPED:
+                activity_type = "Message Dropped";
+                break;
+        }
+        
+        cout << "Log Entry #" << i+1 << ":" <<endl;
+        cout << "Activity: " << activity_type << endl;
+        cout << "Timestamp: " << log.timestamp << endl;
+        cout << "Number of frames: " << log.number_of_frames << endl;
+        cout << "Number of hops: " << log.number_of_hops << endl;
+        cout << "Sender ID: " << log.sender_id << endl;
+        cout << "Receiver ID: " << log.receiver_id << endl;
+        cout << "Success: " << (log.success_status ? "Yes" : "No") << endl;
+        if(log.activity_type == ActivityType::MESSAGE_RECEIVED){
+            cout << "Message: \"" << log.message_content << "\"" << endl;
+        }
+        if(log.activity_type == ActivityType::MESSAGE_SENT){
+            cout << "Message: \"" << log.message_content << "\"" << endl;
+        }
+    }
 }
 
 void Network::invalid_command(){
