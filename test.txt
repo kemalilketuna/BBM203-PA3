@@ -1,0 +1,88 @@
+void Network::receive_command(vector<Client> &clients){
+
+    for (int i = 0; i < clients.size(); ++i) {
+        Client *receiver = &clients[i];
+        if(receiver->incoming_queue.empty()){
+            continue;
+        }
+
+        vector<queue<stack<Packet*>>> message_list;
+        queue<stack<Packet*>> new_message;
+        message_list.push_back(new_message);
+        int last_frame_idx = 0;
+        while (!receiver->incoming_queue.empty()){
+            stack<Packet*> frame = receiver->incoming_queue.front();
+            receiver->incoming_queue.pop();
+            if(last_frame_idx < ((PhysicalLayerPacket*) frame.top())->get_frame_idx()){
+                last_frame_idx++;
+                new_message.push(frame);
+            }
+            else{
+                new_message = queue<stack<Packet*>>();
+                message_list.push_back(new_message);
+                new_message.push(frame);
+                last_frame_idx = 1;
+            }
+        }
+
+        for(int msg_idx = 0; msg_idx < message_list.size(); ++msg_idx){
+            queue<stack<Packet*>> message = message_list[msg_idx];
+            // check message received
+            if(((PhysicalLayerPacket*)message.front().top())->receiver_MAC_address == receiver->client_mac){
+                //message is received
+                string message_data = "";
+                string sender_id = "";
+                while (!message.empty()){
+                    stack<Packet*> frame = message.front();
+                    delete frame.top();
+                    message.pop();
+                    delete frame.top();
+                    message.pop();
+                    delete frame.top();
+                    message.pop();
+                    ApplicationLayerPacket* app_packet = (ApplicationLayerPacket*) frame.top();
+                    frame.pop();
+                    message_data += app_packet->message_data;
+                    if (sender_id == ""){
+                        sender_id = app_packet->sender_ID;
+                    }
+                    delete app_packet;
+                }
+                cout << "Client " << receiver->client_id << " received the message: \"" << message_data << "\" from client " << sender_id <<"."<< endl;
+            }else{
+                //message is not received
+                //check is next hop is accessible
+                string message_receiver_id = "";
+                stack <Packet*> frame = message.front();
+                PhysicalLayerPacket* physical_packet = (PhysicalLayerPacket*) frame.top();
+                frame.pop();
+                NetworkLayerPacket* network_packet = (NetworkLayerPacket*) frame.top();
+                frame.pop();
+                TransportLayerPacket* transport_packet = (TransportLayerPacket*) frame.top();
+                frame.pop();
+                ApplicationLayerPacket* app_packet = (ApplicationLayerPacket*) frame.top();
+                frame.pop();
+                message_receiver_id = app_packet->receiver_ID;
+                string next_hop = receiver->routing_table[message_receiver_id];
+                Client* next_hop_client = client_find_id(clients, next_hop);
+                if(next_hop_client != nullptr){
+                    // next hop is accessible
+                }else{
+                    // next hop is not accessible
+                    while (!message.empty()){
+                        stack<Packet*> frame = message.front();
+                        delete frame.top();
+                        message.pop();
+                        delete frame.top();
+                        message.pop();
+                        delete frame.top();
+                        message.pop();
+                        ApplicationLayerPacket* app_packet = (ApplicationLayerPacket*) frame.top();
+                        frame.pop();
+                        delete app_packet;
+                    }
+                }
+            }
+        }
+    }      
+}

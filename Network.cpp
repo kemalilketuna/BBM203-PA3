@@ -237,40 +237,112 @@ void Network::send_command(vector<Client> &clients){
 
 void Network::receive_command(vector<Client> &clients){
 
-    // for (int i = 0; i < clients.size(); ++i) {
-    //     Client *receiver = &clients[i];
-    //     if(receiver->incoming_queue.empty()){
-    //         continue;
-    //     }
+    for (int i = 0; i < clients.size(); ++i) {
+        Client *client = &clients[i];
+        if(client->incoming_queue.empty()){
+            continue;
+        }
 
-    //     vector<queue<stack<Packet*>>> message_list;
-    //     queue<stack<Packet*>> new_message;
-    //     message_list.push_back(new_message);
-    //     int last_frame_idx = 0;
-    //     while (!receiver->incoming_queue.empty()){
-    //         stack<Packet*> frame = receiver->incoming_queue.front();
-    //         receiver->incoming_queue.pop();
-    //         if(last_frame_idx < ((PhysicalLayerPacket*) frame.top())->get_frame_idx()){
-    //             last_frame_idx++;
-    //             new_message.push(frame);
-    //         }else{
-    //             new_message = queue<stack<Packet*>>();
-    //             message_list.push_back(new_message);
-    //             new_message.push(frame);
-    //             last_frame_idx = 1;
-    //         }
-    //     }
+        string sender_client_id = "";
+        string received_message = "";
+        while (!client->incoming_queue.empty()){
+            stack <Packet*> frame = client->incoming_queue.front();
+            client->incoming_queue.pop();
 
-    //     for(int msg_idx = 0; msg_idx < message_list.size(); ++msg_idx){
-    //         queue<stack<Packet*>> message = message_list[msg_idx];
-    //         // check message received
-    //         if(((PhysicalLayerPacket*)message.front().top())->receiver_MAC_address == receiver->client_mac){
-    //             //message is received
-    //         }else{
-    //             //message is not received
-    //         }
-    //     } 
-    // }      
+            PhysicalLayerPacket* physical_packet = (PhysicalLayerPacket*) frame.top();
+            frame.pop();
+            NetworkLayerPacket* network_packet = (NetworkLayerPacket*) frame.top();
+            frame.pop();
+            TransportLayerPacket* transport_packet = (TransportLayerPacket*) frame.top();
+            frame.pop();
+            ApplicationLayerPacket* app_packet = (ApplicationLayerPacket*) frame.top();
+            frame.pop();
+
+            Client *previous_hop_client = client_find_mac(clients, physical_packet->sender_MAC_address);
+
+            // Check message received
+            if(app_packet->receiver_ID == client->client_id){
+                received_message += app_packet->message_data;
+                //Client E receiving frame #4 from client D, originating from client C
+                cout << "Client " << client->client_id << " receiving frame #" << physical_packet->get_frame_idx() << " from client " << previous_hop_client->client_id << ", originating from client " << app_packet->sender_ID << endl;
+                physical_packet->print();
+                network_packet->print();
+                transport_packet->print();
+                app_packet->print();
+                cout << "Message chunk carried: \"" << app_packet->message_data << "\"" << endl;
+                cout << "Number of hops so far: " << physical_packet->get_hop_count() << endl;
+                cout << "--------" << endl;
+                
+                if(
+                    (client->incoming_queue.empty() and received_message.length() != 0) or
+                    (!client->incoming_queue.empty() and ((PhysicalLayerPacket*)client->incoming_queue.front().top())->get_frame_idx() < physical_packet->get_frame_idx())
+                ){
+                    //Client E received the message "A few small hops for frames, but a giant leap for this message." from client C.
+                    cout << "Client " << client->client_id << " received the message \"" << received_message << "\" from client " << app_packet->sender_ID << "." << endl;
+                    cout << "--------" << endl;
+                    received_message = "";
+                }
+                
+                delete app_packet;
+                delete transport_packet;
+                delete network_packet;
+                delete physical_packet;
+                
+            }else{
+                //Client B receiving frame #1 from client C, but intended for client E. Forwarding... 
+                string next_hop = client->routing_table[app_packet->receiver_ID];
+                Client* next_hop_client = client_find_id(clients, next_hop);
+                if(next_hop_client == nullptr){
+                    //Error: Unreachable destination. Packets are dropped after 1 hops!
+                    cout << "Client " << client->client_id << " receiving frame #" << physical_packet->get_frame_idx() << " from client " << app_packet->sender_ID << ".Forwarding... "<< endl;
+                    cout << "Error: Unreachable destination. Packets are dropped after "<< physical_packet->get_hop_count() <<" hops!" << endl;
+                    cout << "--------" << endl;
+                    delete app_packet;
+                    delete transport_packet;
+                    delete network_packet;
+                    delete physical_packet;
+                }else{
+                    //Client D receiving a message from client B, but intended for client E. Forwarding... 
+                    cout << "Client " << client->client_id << " receiving a message from client "  << previous_hop_client->client_id << ", but intended for client " << app_packet->receiver_ID << ". Forwarding... " << endl;
+                    // Frame #1 MAC address change: New sender MAC BBBBBBBBBB, new receiver MAC DDDDDDDDDD
+                    cout << "Frame #" << physical_packet->get_frame_idx() << " MAC address change: New sender MAC " << client->client_mac << ", new receiver MAC " << next_hop_client->client_mac << endl;
+                    physical_packet->sender_MAC_address = client->client_mac;
+                    physical_packet->receiver_MAC_address = next_hop_client->client_mac;
+                    stack<Packet*> new_frame;
+                    new_frame.push(app_packet);
+                    new_frame.push(transport_packet);
+                    new_frame.push(network_packet);
+                    new_frame.push(physical_packet);
+                    client->outgoing_queue.push(new_frame);    
+                    
+                    while(!client->incoming_queue.empty() and ((PhysicalLayerPacket*)client->incoming_queue.front().top())->get_frame_idx() > physical_packet->get_frame_idx()){
+                        stack <Packet*> frame = client->incoming_queue.front();
+                        client->incoming_queue.pop();
+
+                        PhysicalLayerPacket* physical_packet = (PhysicalLayerPacket*) frame.top();
+                        frame.pop();
+                        NetworkLayerPacket* network_packet = (NetworkLayerPacket*) frame.top();
+                        frame.pop();
+                        TransportLayerPacket* transport_packet = (TransportLayerPacket*) frame.top();
+                        frame.pop();
+                        ApplicationLayerPacket* app_packet = (ApplicationLayerPacket*) frame.top();
+                        frame.pop();
+                        cout << "Frame #" << physical_packet->get_frame_idx() << " MAC address change: New sender MAC " << client->client_mac << ", new receiver MAC " << next_hop_client->client_mac << endl;
+                        physical_packet->sender_MAC_address = client->client_mac;
+                        physical_packet->receiver_MAC_address = next_hop_client->client_mac;
+                        stack<Packet*> new_frame;
+                        new_frame.push(app_packet);
+                        new_frame.push(transport_packet);
+                        new_frame.push(network_packet);
+                        new_frame.push(physical_packet);
+                        client->outgoing_queue.push(new_frame);    
+                    }
+
+                    cout << "--------" << endl;
+                }
+            }
+        }
+    }      
 }
 
 void Network::print_log_command(){
