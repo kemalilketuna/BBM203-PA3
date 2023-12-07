@@ -303,16 +303,16 @@ void Network::receive_command(vector<Client> &clients){
                     int frame_idx = physical_packet->get_frame_idx();
                     string receiver_id = app_packet->receiver_ID;
                     string sender_id = app_packet->sender_ID;
+                    //Client X receiving frame #1 from client C, but intended for client D. Forwarding... 
                     //Error: Unreachable destination. Packets are dropped after 1 hops!
-                    cout << "Client " << client->client_id << " receiving frame #" << physical_packet->get_frame_idx() << " from client " << app_packet->sender_ID << ".Forwarding... "<< endl;
+                    cout << "Client " << client->client_id << " receiving frame #" << physical_packet->get_frame_idx() << " from client " << previous_hop_client->client_id << ", but intended for client " << app_packet->receiver_ID << ". Forwarding... " << endl;
                     cout << "Error: Unreachable destination. Packets are dropped after "<< physical_packet->get_hop_count() <<" hops!" << endl;
-                    cout << "--------" << endl;
                     delete app_packet;
                     delete transport_packet;
                     delete network_packet;
                     delete physical_packet;
 
-                    while(!client->incoming_queue.empty() and ((PhysicalLayerPacket*)client->incoming_queue.front().top())->get_frame_idx() > physical_packet->get_frame_idx()){
+                    while(!client->incoming_queue.empty() and ((PhysicalLayerPacket*)client->incoming_queue.front().top())->get_frame_idx() > frame_idx){
                         stack <Packet*> frame = client->incoming_queue.front();
                         client->incoming_queue.pop();
 
@@ -324,9 +324,8 @@ void Network::receive_command(vector<Client> &clients){
                         frame.pop();
                         ApplicationLayerPacket* app_packet = (ApplicationLayerPacket*) frame.top();
                         frame.pop();
-                        cout << "Client " << client->client_id << " receiving frame #" << physical_packet->get_frame_idx() << " from client " << app_packet->sender_ID << ".Forwarding... "<< endl;
+                        cout << "Client " << client->client_id << " receiving frame #" << physical_packet->get_frame_idx() << " from client " << previous_hop_client->client_id << ", but intended for client " << app_packet->receiver_ID << ". Forwarding... " << endl;
                         cout << "Error: Unreachable destination. Packets are dropped after "<< physical_packet->get_hop_count() <<" hops!" << endl;
-                        cout << "--------" << endl;
                         frame_idx = physical_packet->get_frame_idx();
                         delete app_packet;
                         delete transport_packet;
@@ -337,7 +336,7 @@ void Network::receive_command(vector<Client> &clients){
                     // Create Log
                     Log* log = new Log("2023-11-22 20:30:03", "", frame_idx, hop_count, sender_id, receiver_id, false, ActivityType::MESSAGE_DROPPED);
                     client->log_entries.push_back(*log);
-
+                    cout << "--------" << endl;
                 }else{
                     int frame_idx = physical_packet->get_frame_idx();
                     //Client D receiving a message from client B, but intended for client E. Forwarding... 

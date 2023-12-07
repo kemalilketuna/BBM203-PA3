@@ -93,5 +93,6 @@
         "variant": "cpp",
         "stack": "cpp",
         "queue": "cpp"
-    }
+    },
+    "terminal.integrated.scrollback": 10000
 }
