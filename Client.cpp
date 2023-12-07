@@ -37,9 +37,4 @@ Client::~Client() {
         }
         outgoing_queue.pop();
     }
-
-    // while (!log_entries.empty()) {
-    //     delete &(log_entries.back());
-    //     log_entries.pop_back();
-    // }
 }

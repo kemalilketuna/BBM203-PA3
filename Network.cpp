@@ -110,8 +110,7 @@ void Network::message_command(vector<Client> &clients, int message_limit, const 
     }
 
     // Create Log
-    Log* log = new Log("2023-11-22 20:30:03", message, frame_idx, 0, sender_id, receiver_id, true, ActivityType::MESSAGE_SENT);
-    sender->log_entries.push_back(*log);
+    sender->log_entries.push_back(Log("2023-11-22 20:30:03", message, frame_idx, 0, sender_id, receiver_id, true, ActivityType::MESSAGE_SENT));
 }
 
 void Network::show_frame_info_command(vector<Client> &clients, string command){
@@ -280,8 +279,7 @@ void Network::receive_command(vector<Client> &clients){
                     (!client->incoming_queue.empty() and ((PhysicalLayerPacket*)client->incoming_queue.front().top())->get_frame_idx() < physical_packet->get_frame_idx())
                 ){
                     // Create Log
-                    Log* log = new Log("2023-11-22 20:30:03", received_message, physical_packet->get_frame_idx(), physical_packet->get_hop_count(), app_packet->sender_ID, app_packet->receiver_ID, true, ActivityType::MESSAGE_RECEIVED);
-                    client->log_entries.push_back(*log);
+                    client->log_entries.push_back(Log("2023-11-22 20:30:03", received_message, physical_packet->get_frame_idx(), physical_packet->get_hop_count(), app_packet->sender_ID, app_packet->receiver_ID, true, ActivityType::MESSAGE_RECEIVED));
 
                     //Client E received the message "A few small hops for frames, but a giant leap for this message." from client C.
                     cout << "Client " << client->client_id << " received the message \"" << received_message << "\" from client " << app_packet->sender_ID << "." << endl;
@@ -334,8 +332,7 @@ void Network::receive_command(vector<Client> &clients){
                     }
 
                     // Create Log
-                    Log* log = new Log("2023-11-22 20:30:03", "", frame_idx, hop_count, sender_id, receiver_id, false, ActivityType::MESSAGE_DROPPED);
-                    client->log_entries.push_back(*log);
+                    client->log_entries.push_back(Log("2023-11-22 20:30:03", "", frame_idx, hop_count, sender_id, receiver_id, false, ActivityType::MESSAGE_DROPPED));
                     cout << "--------" << endl;
                 }else{
                     int frame_idx = physical_packet->get_frame_idx();
@@ -378,8 +375,7 @@ void Network::receive_command(vector<Client> &clients){
                     cout << "--------" << endl;
                     
                     // Create Message Forwarded Log
-                    Log* log = new Log("2023-11-22 20:30:03", "", frame_idx, physical_packet->get_hop_count(), app_packet->sender_ID, app_packet->receiver_ID, true, ActivityType::MESSAGE_FORWARDED);
-                    client->log_entries.push_back(*log);
+                    client->log_entries.push_back(Log("2023-11-22 20:30:03", "", frame_idx, physical_packet->get_hop_count(), app_packet->sender_ID, app_packet->receiver_ID, true, ActivityType::MESSAGE_FORWARDED));
                 }
             }
         }
